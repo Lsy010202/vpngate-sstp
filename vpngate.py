@@ -194,7 +194,7 @@ def ws_vless_e2e(node_host, node_ip, timeout=30):
 
 
 def build_link(node):
-    path = f"/{EDT_UUID}/gsstp=vpn:vpn@{node['host']}:443"
+    path = f"/{EDT_UUID}/gsstp=vpn:vpn@{node['ip']}:443"
     name = f"VG-{node['cc']}-{node['ip']}"
     return (f"vless://{EDT_UUID}@{EDT_DOMAIN}:443?security=tls&type=ws"
             f"&host={EDT_DOMAIN}&path={quote(path, safe='')}"
@@ -209,14 +209,14 @@ def main():
     print("== SSTP 握手检测 ==", flush=True)
     hs_ok = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as ex:
-        futs = {ex.submit(sstp_handshake, n["host"]): n for n in cands}
+        futs = {ex.submit(sstp_handshake, n["ip"]): n for n in cands}
         for f in concurrent.futures.as_completed(futs):
             n = futs[f]
             ok, ms = f.result()
             if ok:
                 n["hs_ms"] = ms
                 hs_ok.append(n)
-                print(f"  握手通过: {n['host']} ({n['ip']}) {n['cc']} {ms}ms", flush=True)
+                print(f"  握手通过: {n['ip']} ({n['host']}) {n['cc']} {ms}ms", flush=True)
     print(f"握手通过: {len(hs_ok)} 个", flush=True)
     if not hs_ok:
         print("ERROR: 没有可用的 SSTP 节点", flush=True)
@@ -225,7 +225,7 @@ def main():
     print("== 全链路验证 (VLESS->Worker->SSTP->外网) ==", flush=True)
     verified = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-        futs = {ex.submit(ws_vless_e2e, n["host"], n["ip"]): n for n in hs_ok[:24]}
+        futs = {ex.submit(ws_vless_e2e, n["ip"], n["ip"]): n for n in hs_ok[:24]}
         for f in concurrent.futures.as_completed(futs):
             n = futs[f]
             exit_ip = f.result()
@@ -233,7 +233,7 @@ def main():
             # 出口 IP 必须等于节点 IP, 否则可能是 Worker 兜底直连
             n["residential_ok"] = (exit_ip == n["ip"])
             flag = "住宅出口✓" if n["residential_ok"] else ("出口漂移✗" if exit_ip else "不通✗")
-            print(f"  {n['host']}: 出口 {exit_ip} {flag}", flush=True)
+            print(f"  {n['ip']}: 出口 {exit_ip} {flag}", flush=True)
             if exit_ip:
                 verified.append(n)
     # 优先保留出口 IP 吻合的节点
@@ -253,7 +253,7 @@ def main():
     with open(os.path.join(OUT_DIR, "sub.txt"), "w") as f:
         f.write(b64mod.b64encode("\n".join(links).encode()).decode())
     with open(os.path.join(OUT_DIR, "hosts.txt"), "w") as f:
-        f.write("\n".join(f"vpn:vpn@{n['host']}:443  # {n['cc']} {n['ip']}"
+        f.write("\n".join(f"vpn:vpn@{n['ip']}:443  # {n['cc']} {n['host']}"
                           for n in nodes) + "\n")
     with open(os.path.join(OUT_DIR, "meta.json"), "w") as f:
         json.dump({"updated": now, "count": len(nodes), "domain": EDT_DOMAIN,
