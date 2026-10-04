@@ -88,7 +88,7 @@ def vless_fetch(path, target_host, label):
     uuid_b = bytes.fromhex(UUID.replace("-", ""))
     tb = target_host.encode()
     vless = (b"\x00" + uuid_b + b"\x00" + b"\x01" + struct.pack(">H", 80)
-             + b"\x03" + bytes([len(tb)]) + tb)
+             + b"\x02" + bytes([len(tb)]) + tb)
     ws_send(t, vless)
     ws_send(t, f"GET / HTTP/1.1\r\nHost: {target_host}\r\nConnection: close\r\n\r\n".encode())
     out = ws_recv_all(t)
