@@ -29,15 +29,25 @@ class SSTP:
         out, self.buf = self.buf[:n], self.buf[n:]
         return out
 
+    def build_lcp(self, ident=1):
+        frame = struct.pack(">H", 0xC021) + bytes([1, ident]) \
+            + struct.pack(">H", 8) + bytes([1, 4]) + struct.pack(">H", 1500)
+        pkt_len = 6 + 2 + len(frame)
+        hdr = bytes([0x10, 0x00, ((pkt_len >> 8) & 0x0F) | 0x80,
+                     pkt_len & 0xFF, 0xFF, 0x03])
+        return hdr + frame
+
     def handshake(self):
         corr = str(uuidmod.uuid4())
-        self.t.sendall((
+        http_req = (
             "SSTP_DUPLEX_POST /sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/ HTTP/1.1\r\n"
             f"Host: {HOST}\r\nContent-Length: 18446744073709551615\r\n"
-            f"SSTPCORRELATIONID: {{{corr}}}\r\n\r\n").encode())
+            f"SSTPCORRELATIONID: {{{corr}}}\r\n\r\n").encode()
         pkt = bytes([0x10, 0x01]) + struct.pack(">H", 14 | 0x8000) + bytes([
             0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x06, 0x00, 0x01])
-        self.t.sendall(pkt)
+        # worker 同款: HTTP请求 + CALL_CONNECT_REQUEST + LCP 一次性发出
+        self.t.sendall(http_req + pkt + self.build_lcp(1))
+        print("已一次性发出 HTTP+握手+LCP", flush=True)
         status = b""
         while b"\r\n" not in status:
             status += self._recv(1)
@@ -82,9 +92,7 @@ def main():
     if not s.handshake():
         print("握手失败")
         return
-    # LCP Configure-Request: MRU=1500
-    s.send_ppp(0xC021, 1, 1, bytes([1, 4]) + struct.pack(">H", 1500))
-    print("-> LCP Configure-Request", flush=True)
+    print("等待 LCP 回应...", flush=True)
     for _ in range(8):
         proto, code, ident, payload = s.recv_ppp()
         names = {1: "Req", 2: "Ack", 3: "Nak", 4: "Rej", 5: "TermReq", 6: "TermAck"}
