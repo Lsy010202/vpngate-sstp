@@ -86,8 +86,11 @@ def parse_csv(raw):
     return nodes
 
 
-def sstp_handshake(host, timeout=12):
-    """返回 (ok, 握手耗时ms)."""
+def sstp_handshake(host, timeout=15):
+    """SSTP-over-HTTPS 握手 (与 edgetunnel 同款编码).
+    TLS -> SSTP_DUPLEX_POST -> 14字节 CALL_CONNECT_REQUEST -> 期望 HTTP 200 + ACK.
+    返回 (ok, 握手耗时ms)."""
+    import uuid as uuidmod
     t0 = time.time()
     try:
         s = socket.create_connection((host, 443), timeout=timeout)
@@ -96,16 +99,52 @@ def sstp_handshake(host, timeout=12):
         ctx.verify_mode = ssl.CERT_NONE
         t = ctx.wrap_socket(s, server_hostname=host)
         t.settimeout(timeout)
-        pkt = bytes([0x10, 0x01, 0x00, 0x10,
-                     0x00, 0x01, 0x00, 0x01,
-                     0x00, 0x01, 0x00, 0x08,
-                     0x00, 0x00, 0x00, 0x01])
+        corr = str(uuidmod.uuid4())
+        t.sendall((
+            "SSTP_DUPLEX_POST /sra_{BA195980-CD49-458b-9E23-C84EE0ADCD75}/ HTTP/1.1\r\n"
+            f"Host: {host}\r\n"
+            "Content-Length: 18446744073709551615\r\n"
+            f"SSTPCORRELATIONID: {{{corr}}}\r\n\r\n"
+        ).encode())
+        pkt = (bytes([0x10, 0x01]) + struct.pack(">H", 14 | 0x8000) + bytes([
+            0x00, 0x01,  # CALL_CONNECT_REQUEST
+            0x00, 0x01,  # 1 attribute
+            0x00, 0x01, 0x00, 0x06,
+            0x00, 0x01,  # ENCAPSULATED_PROTOCOL_ID = PPP
+        ]))
         t.sendall(pkt)
-        resp = t.recv(64)
+        status = b""
+        while b"\r\n" not in status:
+            c = t.recv(1)
+            if not c:
+                return False, 0
+            status += c
+        if b" 200" not in status:
+            t.close()
+            return False, 0
+        while True:  # 读完 headers
+            line = b""
+            while not line.endswith(b"\r\n"):
+                c = t.recv(1)
+                if not c:
+                    break
+                line += c
+            if line in (b"\r\n", b""):
+                break
+        hdr = t.recv(4)
+        if len(hdr) < 4:
+            t.close()
+            return False, 0
+        length = struct.unpack(">H", hdr[2:4])[0] & 0x7FFF
+        body = b""
+        while len(body) < length - 4:
+            c = t.recv(length - 4 - len(body))
+            if not c:
+                break
+            body += c
         t.close()
-        if len(resp) >= 8 and resp[0] == 0x10 and resp[1] == 0x01:
-            if struct.unpack(">H", resp[4:6])[0] == 0x0002:  # CALL_CONNECT_ACK
-                return True, int((time.time() - t0) * 1000)
+        if len(body) >= 2 and struct.unpack(">H", body[0:2])[0] == 0x0002:
+            return True, int((time.time() - t0) * 1000)
         return False, 0
     except Exception as e:
         if os.environ.get("DEBUG_SSTP"):
@@ -210,9 +249,8 @@ def main():
 
     print("== SSTP 握手检测 ==", flush=True)
     hs_ok = []
-    dbg = os.environ.get("DEBUG_SSTP")
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as ex:
-        futs = {ex.submit(sstp_handshake, n["ip"]): n for n in (cands[:12] if dbg else cands)}
+        futs = {ex.submit(sstp_handshake, n["ip"]): n for n in cands}
         for f in concurrent.futures.as_completed(futs):
             n = futs[f]
             ok, ms = f.result()
