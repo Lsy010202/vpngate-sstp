@@ -205,7 +205,7 @@ def ws_vless_e2e(node_host, node_ip, timeout=30):
         uuid_b = bytes.fromhex(EDT_UUID.replace("-", ""))
         tgt = b"api.ipify.org"
         vless = (b"\x00" + uuid_b + b"\x00" + b"\x01" + struct.pack(">H", 80)
-                 + b"\x03" + bytes([len(tgt)]) + tgt)
+                 + b"\x02" + bytes([len(tgt)]) + tgt)
         ws_send(vless)
         ws_send(b"GET / HTTP/1.1\r\nHost: api.ipify.org\r\nConnection: close\r\n\r\n")
         out = b""
