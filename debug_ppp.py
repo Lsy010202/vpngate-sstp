@@ -5,7 +5,7 @@ import ssl
 import struct
 import uuid as uuidmod
 
-HOST = "219.100.37.217"
+HOST = "217.138.212.62"
 TIMEOUT = 20
 
 
