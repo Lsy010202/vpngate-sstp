@@ -3,7 +3,7 @@ name: VPN Gate Node Check
 on:
   schedule:
     # 每小时一次(错开整点); 免费额度约 2000 分钟/月, 每小时跑一次约消耗 700-1000 分钟/月
-    - cron: "17 * * * *"
+    # - cron: "17 * * * *"  # 已暂停: 免费版 Worker 不支持 TCP 出站, 见 README
   workflow_dispatch:
 
 permissions:
