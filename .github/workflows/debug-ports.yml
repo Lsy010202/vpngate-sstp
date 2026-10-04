@@ -1,6 +1,11 @@
-name: Debug Ports (temporary)
+name: Debug Runner (temporary)
 on:
   workflow_dispatch:
+    inputs:
+      script:
+        description: "要运行的诊断脚本"
+        required: true
+        default: "debug_ports.py"
 permissions:
   contents: read
 jobs:
@@ -12,4 +17,4 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python debug_ports.py
+      - run: python ${{ inputs.script }}
