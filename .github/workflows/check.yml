@@ -36,6 +36,7 @@ jobs:
         env:
           EDT_DOMAIN: ${{ secrets.EDT_DOMAIN }}
           EDT_UUID: ${{ secrets.EDT_UUID }}
+          DEBUG_SSTP: "1"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
