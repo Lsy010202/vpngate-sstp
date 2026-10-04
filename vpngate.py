@@ -107,7 +107,9 @@ def sstp_handshake(host, timeout=12):
             if struct.unpack(">H", resp[4:6])[0] == 0x0002:  # CALL_CONNECT_ACK
                 return True, int((time.time() - t0) * 1000)
         return False, 0
-    except Exception:
+    except Exception as e:
+        if os.environ.get("DEBUG_SSTP"):
+            print(f"  [debug] {host}: {type(e).__name__} {str(e)[:80]}", flush=True)
         return False, 0
 
 
@@ -208,8 +210,9 @@ def main():
 
     print("== SSTP 握手检测 ==", flush=True)
     hs_ok = []
+    dbg = os.environ.get("DEBUG_SSTP")
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as ex:
-        futs = {ex.submit(sstp_handshake, n["ip"]): n for n in cands}
+        futs = {ex.submit(sstp_handshake, n["ip"]): n for n in (cands[:12] if dbg else cands)}
         for f in concurrent.futures.as_completed(futs):
             n = futs[f]
             ok, ms = f.result()
