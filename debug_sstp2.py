@@ -25,12 +25,14 @@ def sstp_https_handshake(host, timeout=15):
             f"SSTPCORRELATIONID: {{{corr}}}\r\n\r\n"
         )
         t.sendall(http_req.encode())
-        # CALL_CONNECT_REQUEST, edgetunnel 同款编码: [0x10,0x01] + u16be(len|0x8000)
-        pkt = (bytes([0x10, 0x01]) + struct.pack(">H", 16 | 0x8000) + bytes([
+        # CALL_CONNECT_REQUEST, edgetunnel 同款编码 (14字节):
+        # [0x10,0x01] + u16be(14|0x8000) + msg=0x0001 + attrs=1
+        # + attr(reserved=0, id=1, len=6, value=u16be(1)=PPP)
+        pkt = (bytes([0x10, 0x01]) + struct.pack(">H", 14 | 0x8000) + bytes([
             0x00, 0x01,  # CALL_CONNECT_REQUEST
             0x00, 0x01,  # 1 attribute
-            0x00, 0x01, 0x00, 0x08,
-            0x00, 0x00, 0x00, 0x01]))
+            0x00, 0x01, 0x00, 0x06,
+            0x00, 0x01]))
         t.sendall(pkt)
         # 读 HTTP 状态行
         status = b""
