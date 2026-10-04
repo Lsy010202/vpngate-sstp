@@ -96,8 +96,12 @@ def main():
     for _ in range(8):
         proto, code, ident, payload = s.recv_ppp()
         names = {1: "Req", 2: "Ack", 3: "Nak", 4: "Rej", 5: "TermReq", 6: "TermAck"}
+        extra = ""
+        if proto == 0xC021 and payload[:1] == b"\x03" and len(payload) >= 4:
+            aproto = struct.unpack(">H", payload[2:4])[0]
+            extra = f" 要求认证协议={hex(aproto)}({'PAP' if aproto==0xc023 else 'CHAP' if aproto==0xc223 else '未知'})"
         print(f"<- proto={hex(proto)} {names.get(code, code)} id={ident} "
-              f"payload={payload.hex()[:40]}", flush=True)
+              f"payload={payload.hex()}{extra}", flush=True)
         if proto == 0xC021 and code == 2:
             print("LCP Acked!", flush=True)
             break
