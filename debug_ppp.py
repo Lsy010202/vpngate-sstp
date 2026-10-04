@@ -5,7 +5,7 @@ import ssl
 import struct
 import uuid as uuidmod
 
-HOST = "217.138.212.62"
+HOST = "219.100.37.217"
 TIMEOUT = 20
 
 
@@ -32,7 +32,7 @@ class SSTP:
     def build_lcp(self, ident=1):
         frame = struct.pack(">H", 0xC021) + bytes([1, ident]) \
             + struct.pack(">H", 8) + bytes([1, 4]) + struct.pack(">H", 1500)
-        pkt_len = 6 + 2 + len(frame)
+        pkt_len = 6 + len(frame)  # header(6, 已含FF 03) + PPP帧
         hdr = bytes([0x10, 0x00, ((pkt_len >> 8) & 0x0F) | 0x80,
                      pkt_len & 0xFF, 0xFF, 0x03])
         return hdr + frame
@@ -69,7 +69,7 @@ class SSTP:
         # SSTP data 包: [0x10,0x00,len|0x80..] + FF 03 + proto + code/id/len + payload
         frame = struct.pack(">H", proto) + bytes([code, ident]) \
             + struct.pack(">H", 4 + len(payload)) + payload
-        pkt_len = 6 + 2 + len(frame)
+        pkt_len = 6 + len(frame)
         hdr = bytes([0x10, 0x00, ((pkt_len >> 8) & 0x0F) | 0x80,
                      pkt_len & 0xFF, 0xFF, 0x03])
         self.t.sendall(hdr + frame)
